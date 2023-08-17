@@ -1,9 +1,9 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useNavigate, Outlet } from 'react-router-dom'
 import { AppBar, Toolbar, Menu, MenuItem, Box, Typography, IconButton } from '@mui/material'
 import MenuIcon from '@mui/icons-material/Menu'
 import AccountCircleIcon from '@mui/icons-material/AccountCircle'
-import { useRecoilState } from 'recoil'
+import { useRecoilValue } from 'recoil'
 import { userState } from '@/store/user'
 import { Auth } from '@aws-amplify/auth'
 import awsconfig from '@/aws-exports'
@@ -15,7 +15,7 @@ const drawerWidth = 240
 Auth.configure(awsconfig)
 
 export default function Layout() {
-  const [user] = useRecoilState(userState)
+  const user = useRecoilValue(userState)
   const [anchorEl, setAnchorEl] = useState<HTMLElement | null>(null)
   const navigate = useNavigate()
 
@@ -37,6 +37,11 @@ export default function Layout() {
       console.log('error signing out: ', error)
     }
   }
+
+  useEffect(() => {
+    if (!user) navigate('/')
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user])
 
   return (
     <Box sx={{ display: 'flex' }}>

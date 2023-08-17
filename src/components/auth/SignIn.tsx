@@ -62,21 +62,23 @@ export default function CardSignIn() {
     try {
       const user: CognitoUser = await Auth.signIn(data.email, data.password)
 
-      const idToken = user.signInUserSession.idToken
-      setUser({
-        token: idToken.jwtToken,
-        id: idToken.payload['cognito:username'],
-        name: idToken.payload.name,
-        email: idToken.payload.email,
-        phone_number: idToken.payload.phone_number,
-        auth_time: idToken.payload.auth_time,
-        iat: idToken.payload.iat,
-        exp: idToken.payload.exp,
-        signInResponse: user
-      })
-
       const { challengeName } = user
+
       if (!challengeName) {
+        const idToken = user.signInUserSession.idToken
+        setUser({
+          token: idToken.jwtToken,
+          id: idToken.payload['cognito:username'],
+          sub: idToken.payload.sub,
+          name: idToken.payload.name,
+          email: idToken.payload.email,
+          phone_number: idToken.payload.phone_number,
+          auth_time: idToken.payload.auth_time,
+          iat: idToken.payload.iat,
+          exp: idToken.payload.exp,
+          signInResponse: user
+        })
+
         navigate('/main/')
         return
       }
@@ -89,6 +91,19 @@ export default function CardSignIn() {
           return
         }
         await Auth.confirmSignIn(user, code, 'SOFTWARE_TOKEN_MFA')
+        const idToken = user.signInUserSession.idToken
+        setUser({
+          token: idToken.jwtToken,
+          id: idToken.payload['cognito:username'],
+          sub: idToken.payload.sub,
+          name: idToken.payload.name,
+          email: idToken.payload.email,
+          phone_number: idToken.payload.phone_number,
+          auth_time: idToken.payload.auth_time,
+          iat: idToken.payload.iat,
+          exp: idToken.payload.exp,
+          signInResponse: user
+        })
         navigate('/main/')
         // Todo:
       } else if (challengeName === 'NEW_PASSWORD_REQUIRED') {
@@ -152,6 +167,9 @@ export default function CardSignIn() {
         </div>
         <div>
           <Link href="/forgotPassword">forgotPassword</Link>
+        </div>
+        <div>
+          <Link href="/experimental/">signup</Link>
         </div>
       </CardContent>
     </Card>

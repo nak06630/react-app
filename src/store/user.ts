@@ -2,6 +2,7 @@ import { atom } from 'recoil'
 
 interface User {
   token: string // idToken.jwtToken
+  sub: string
   id: string // 'cognito:username'
   name: string
   email: string
