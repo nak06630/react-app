@@ -9,7 +9,6 @@ import { useSetRecoilState } from 'recoil'
 import { userState } from '@/store/user'
 import { Link } from '@mui/material'
 import { useNavigate } from 'react-router-dom'
-import { teal } from '@mui/material/colors'
 import LockOutlinedIcon from '@mui/icons-material/LockOutlined'
 
 Auth.configure(awsconfig)
@@ -136,22 +135,22 @@ export default function CardSignIn() {
 
   return (
     <Grid>
-      <Paper elevation={3} sx={{ p: 4, width: '380px', m: '20px auto' }}>
-        {isAlert && (
-          <Alert
-            severity="error"
-            onClose={() => {
-              setIsAlert(false)
-            }}
-          >
-            {error}
-          </Alert>
-        )}
+      {isAlert && (
+        <Alert
+          severity="error"
+          onClose={() => {
+            setIsAlert(false)
+          }}
+        >
+          {error}
+        </Alert>
+      )}
+      <Paper elevation={3} sx={{ p: 4, width: '440px', m: '20px auto' }}>
         <Grid container direction="column" alignItems="center">
-          <Avatar sx={{ bgcolor: teal[400] }}>
+          <Avatar sx={{ bgcolor: '#002b62' }}>
             <LockOutlinedIcon />
           </Avatar>
-          <Typography variant={'h5'} sx={{ m: '30px' }}>
+          <Typography component="h1" variant={'h5'} sx={{ m: '30px' }}>
             ログイン
           </Typography>
         </Grid>
