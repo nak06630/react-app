@@ -49,8 +49,6 @@ export const useNavigationMenu = () => {
       console.log('[useNavigationMenu] Error')
       setItems([])
     }
-
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [pathname])
 
   return { items }

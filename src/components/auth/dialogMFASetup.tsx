@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import { SubmitHandler, useForm } from 'react-hook-form'
 import { yupResolver } from '@hookform/resolvers/yup'
 import * as yup from 'yup'
-import { Alert, Button, Card, CardContent, CardHeader, Dialog, TextField, FormControlLabel, Checkbox, Typography, CardActions } from '@mui/material'
+import { Grid, Alert, Button, Card, CardContent, CardHeader, Dialog, TextField, FormControlLabel, Checkbox, Typography, CardActions } from '@mui/material'
 import { useRecoilState } from 'recoil'
 import { userState } from '@/store/user'
 import { Auth } from '@aws-amplify/auth'
@@ -107,28 +107,29 @@ export default function DialogMFASetup(props: { open: boolean; onClose: () => vo
           </Alert>
         )}
         <CardHeader title="MFA設定"></CardHeader>
-        <CardContent>
-          <QRCode value={token} />
-          <TextField
-            sx={{ py: 2 }}
-            label="検証コード"
-            type="number"
-            {...register('code')}
-            size="small"
-            fullWidth
-            error={'code' in errors}
-            helperText={errors.code?.message}
-          />
-          <FormControlLabel
-            label={<Typography sx={{ fontSize: '0.85rem' }}>MFAを利用します</Typography>}
-            control={<Checkbox size="small" {...register('enable')} />}
-          />
-        </CardContent>
-        <CardActions>
-          <Button color="primary" variant="contained" size="large" fullWidth onClick={handleSubmit(onSubmit)}>
-            MFA設定
-          </Button>
-        </CardActions>
+        <form onSubmit={handleSubmit(onSubmit)}>
+          <CardContent>
+            <Grid container direction="column" alignItems="center">
+              <QRCode value={token} />
+            </Grid>
+            <TextField
+              sx={{ py: 2 }}
+              label="検証コード"
+              type="number"
+              {...register('code')}
+              size="small"
+              fullWidth
+              error={'code' in errors}
+              helperText={errors.code?.message}
+            />
+            <FormControlLabel label={<Typography variant="caption">MFAを利用します</Typography>} control={<Checkbox size="small" {...register('enable')} />} />
+          </CardContent>
+          <CardActions>
+            <Button color="primary" variant="contained" size="large" fullWidth onClick={handleSubmit(onSubmit)}>
+              MFA設定
+            </Button>
+          </CardActions>
+        </form>
       </Card>
     </Dialog>
   )

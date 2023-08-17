@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { useNavigate, Outlet } from 'react-router-dom'
+import { useNavigate, Outlet, useLocation } from 'react-router-dom'
 import { AppBar, Toolbar, Menu, MenuItem, Box, Typography, IconButton } from '@mui/material'
 import MenuIcon from '@mui/icons-material/Menu'
 import AccountCircleIcon from '@mui/icons-material/AccountCircle'
@@ -18,6 +18,7 @@ export default function Layout() {
   const user = useRecoilValue(userState)
   const [anchorEl, setAnchorEl] = useState<HTMLElement | null>(null)
   const navigate = useNavigate()
+  const { pathname } = useLocation()
 
   const [isOpen, setIsOpen] = useState(true)
 
@@ -39,7 +40,9 @@ export default function Layout() {
   }
 
   useEffect(() => {
-    if (!user) navigate('/')
+    if (!pathname.match(/^\/experimental\//)) {
+      if (!user) navigate('/')
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user])
 

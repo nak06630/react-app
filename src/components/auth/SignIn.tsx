@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Alert, Button, Card, CardHeader, CardContent, Stack, TextField } from '@mui/material'
+import { Box, Alert, Button, Stack, TextField, Typography, Grid, Paper, Avatar } from '@mui/material'
 import { SubmitHandler, useForm } from 'react-hook-form'
 import { yupResolver } from '@hookform/resolvers/yup'
 import * as yup from 'yup'
@@ -9,6 +9,8 @@ import { useSetRecoilState } from 'recoil'
 import { userState } from '@/store/user'
 import { Link } from '@mui/material'
 import { useNavigate } from 'react-router-dom'
+import { teal } from '@mui/material/colors'
+import LockOutlinedIcon from '@mui/icons-material/LockOutlined'
 
 Auth.configure(awsconfig)
 
@@ -133,19 +135,26 @@ export default function CardSignIn() {
   }
 
   return (
-    <Card sx={{ p: 4, width: '480px', m: '20px auto' }}>
-      {isAlert && (
-        <Alert
-          severity="error"
-          onClose={() => {
-            setIsAlert(false)
-          }}
-        >
-          {error}
-        </Alert>
-      )}
-      <CardHeader title="ログイン"></CardHeader>
-      <CardContent>
+    <Grid>
+      <Paper elevation={3} sx={{ p: 4, width: '380px', m: '20px auto' }}>
+        {isAlert && (
+          <Alert
+            severity="error"
+            onClose={() => {
+              setIsAlert(false)
+            }}
+          >
+            {error}
+          </Alert>
+        )}
+        <Grid container direction="column" alignItems="center">
+          <Avatar sx={{ bgcolor: teal[400] }}>
+            <LockOutlinedIcon />
+          </Avatar>
+          <Typography variant={'h5'} sx={{ m: '30px' }}>
+            ログイン
+          </Typography>
+        </Grid>
         <form onSubmit={handleSubmit(onSubmit)}>
           <Stack spacing={3}>
             <TextField label="ユーザーID" type="email" size="small" {...register('email')} error={'email' in errors} helperText={errors.email?.message} />
@@ -157,21 +166,25 @@ export default function CardSignIn() {
               error={'password' in errors}
               helperText={errors.password?.message}
             />
-            <Button type="submit" color="primary" variant="contained" size="large">
+          </Stack>
+
+          <Box mt={3}>
+            <Button type="submit" color="primary" variant="contained" fullWidth>
               ログイン
             </Button>
-          </Stack>
+
+            <Typography variant="caption">
+              <Link href="/signup">アカウントを作成します</Link>
+            </Typography>
+            <Typography variant="caption" display="block">
+              <Link href="/forgotPassword">パスワードを忘れました</Link>
+            </Typography>
+            <Typography variant="caption" display="block">
+              <Link href="/experimental/">実験用</Link>
+            </Typography>
+          </Box>
         </form>
-        <div>
-          <Link href="/signup">signup</Link>
-        </div>
-        <div>
-          <Link href="/forgotPassword">forgotPassword</Link>
-        </div>
-        <div>
-          <Link href="/experimental/">signup</Link>
-        </div>
-      </CardContent>
-    </Card>
+      </Paper>
+    </Grid>
   )
 }
