@@ -1,0 +1,498 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <title>ReactCDN</title>
+  <meta charset="utf-8">
+  <meta name="viewport" content="initail-scale=1, width=device-width">
+  <!-- React -->
+  <script src="https://unpkg.com/react@18/umd/react.production.min.js" crossorigin></script>
+  <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js" crossorigin></script>
+  <!-- MUI -->
+  <script src="https://unpkg.com/@mui/material@latest/umd/material-ui.production.min.js" crossorigin="anonymous"></script>
+  <!-- Recoil -->
+  <script src="https://cdn.jsdelivr.net/npm/recoil@0.7.7/umd/index.min.js"></script>
+  <!-- Cognito -->
+  <script src="https://unpkg.com/amazon-cognito-identity-js@6/dist/amazon-cognito-identity.min.js"></script>
+  <!-- ReactRouterDom -->
+  <script src='https://unpkg.com/@remix-run/router@1.14.1/dist/router.umd.min.js'></script>
+  <script src='https://unpkg.com/react-router@6/dist/umd/react-router.production.min.js'></script>
+  <script src='https://unpkg.com/react-router-dom@6/dist/umd/react-router-dom.production.min.js'></script>
+  <!-- ReactHookForm -->
+  <script src="https://cdn.jsdelivr.net/npm/react-hook-form@7/dist/index.umd.min.js"></script>
+  <!-- CryptoJS -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/crypto-js/4.2.0/crypto-js.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/crypto-js/4.2.0/aes.min.js"></script>
+  <!-- tanstack -->
+  <script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
+  <script src="https://unpkg.com/@tanstack/react-query@4/build/umd/index.production.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@tanstack/react-table@8.7.0/build/umd/index.production.min.js"></script>
+  <!-- Babel -->
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js" crossorigin="anonymous"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@300;400;500;600;700&display=swap">
+  <link rel="stylesheet" href="https://fonts.googleapis.com/icon?family=Material+Icons">
+</head>
+<body>
+  <div id="app"></div>
+  <script type="text/babel">
+    /************************************************************************
+      env
+     ************************************************************************/
+    const AppName = "ReactCdnApp"
+    const LocalStorageKey = "My Secret key" // 簡単に複合できるので見た目にわからない程度の効果のみ。
+    const poolData = { UserPoolId: "ap-northeast-1_mEDAZ9b89", ClientId: "6ccgqbuq83h89sv49vd8m0krod" }
+
+    const { atom } = Recoil
+    const userState = atom({
+      key: 'userState',
+      default: ''
+    })
+
+    /************************************************************************
+      hooks
+     ************************************************************************/
+
+    const useCognito = () => {
+      //https://github.com/aws-amplify/amplify-js/tree/master/packages/amazon-cognito-identity-js#usage
+      const { useState } = React
+      const { CognitoUserPool, CognitoUser, AuthenticationDetails } = AmazonCognitoIdentity
+
+      const userPool = new CognitoUserPool(poolData)
+
+      const signIn = async (username, password) => {
+        const cognitoUser = new CognitoUser({ Username: username, Pool: userPool })
+        const authenticationDetails = new AuthenticationDetails({ Username: username, Password: password })
+        return new Promise((resolve, reject) => {
+          cognitoUser.authenticateUser(authenticationDetails, {
+            onSuccess: result => resolve(result),
+            onFailure: err => reject(err)
+          })
+        })
+      }
+
+      const signOut = async () => {
+        const cognitoUser = userPool.getCurrentUser()
+        await cognitoUser.signOut()
+      }
+
+      return { signIn, signOut }
+    }
+
+    const useLocalStorage = () => {
+      const loadStorage = () => {
+        try {
+          const encrypted = localStorage.getItem(AppName)
+          const plaintext = CryptoJS.AES.decrypt(encrypted, LocalStorageKey).toString(CryptoJS.enc.Utf8)
+          console.log(`Load localStorage ${AppName}: ${encrypted}`)
+          return JSON.parse(plaintext)
+        } catch {
+          return null
+        }
+      }
+
+      const saveStorage = (item) => {
+        try {
+          const plaintext = JSON.stringify(item)
+          const encrypted = CryptoJS.AES.encrypt(plaintext, LocalStorageKey).toString()
+          console.log(`Save localStorage ${AppName}: ${encrypted}`)
+          localStorage.setItem(AppName, encrypted)
+        } catch {
+          return
+        }
+      }
+
+      return { loadStorage, saveStorage }
+    }
+
+    const fetcher = url => axios.get(url).then(res => res.data)
+    const useFetchUsers = () => {
+      const { useQuery } = ReactQuery
+
+      return useQuery({
+        queryKey: ['users'],
+        queryFn: async () => fetcher('https://jsonplaceholder.typicode.com/users')
+      })
+    }
+
+    /************************************************************************
+     components
+     ************************************************************************/
+    const TablePaginationActions = (props) => {
+      const { Box, IconButton, Icon } = MaterialUI
+      const { count, page, rowsPerPage, onPageChange } = props
+
+      const LastPageIcon = () => <Icon>last_page</Icon>
+      const FirstPageIcon = () => <Icon>first_page</Icon>
+      const KeyboardArrowLeft = () => <Icon>keyboard_arrow_left</Icon>
+      const KeyboardArrowRight = () => <Icon>keyboard_arrow_right</Icon>
+
+      const handleFirstPageButtonClick = (event) => {
+        onPageChange(event, 0)
+      }
+
+      const handleBackButtonClick = (event) => {
+        onPageChange(event, page - 1)
+      }
+
+      const handleNextButtonClick = (event) => {
+        onPageChange(event, page + 1)
+      }
+
+      const handleLastPageButtonClick = (event) => {
+        onPageChange(event, Math.max(0, Math.ceil(count / rowsPerPage) - 1))
+      }
+
+      return (
+        <Box sx={{ flexShrink: 0, ml: 2.5 }}>
+          <IconButton
+            onClick={handleFirstPageButtonClick}
+            disabled={page === 0}
+            aria-label="first page"
+          >
+            <FirstPageIcon />
+          </IconButton>
+          <IconButton
+            onClick={handleBackButtonClick}
+            disabled={page === 0}
+            aria-label="previous page"
+          >
+            <KeyboardArrowLeft />
+          </IconButton>
+          <IconButton
+            onClick={handleNextButtonClick}
+            disabled={page >= Math.ceil(count / rowsPerPage) - 1}
+            aria-label="next page"
+          >
+            <KeyboardArrowRight />
+          </IconButton>
+          <IconButton
+            onClick={handleLastPageButtonClick}
+            disabled={page >= Math.ceil(count / rowsPerPage) - 1}
+            aria-label="last page"
+          >
+            <LastPageIcon />
+          </IconButton>
+        </Box>
+      )
+    }
+
+    const BasicTable = (props) => {
+      const { flexRender, getCoreRowModel, getFilteredRowModel, getPaginationRowModel, useReactTable } = ReactTable
+      const { TableContainer, Paper, Table, TableHead, TableRow, TableCell, TableBody, TablePagination } = MaterialUI
+
+      const { columns, data } = props
+
+      const table = useReactTable({
+        data,
+        columns,
+        getCoreRowModel: getCoreRowModel(),
+        getFilteredRowModel: getFilteredRowModel(),
+        getPaginationRowModel: getPaginationRowModel(),
+        debugTable: true,
+      })
+
+      const { pageSize, pageIndex } = table.getState().pagination
+
+      return (
+        <>
+          <TableContainer component={Paper}>
+            <Table>
+              <TableHead>
+                {table.getHeaderGroups().map((headerGroup) => (
+                  <TableRow key={headerGroup.id}>
+                    {headerGroup.headers.map((header) => (
+                      <TableCell key={header.id} colSpan={header.colSpan}>
+                        {header.isPlaceholder
+                          ? null
+                          : flexRender(header.column.columnDef.header, header.getContext())}
+                      </TableCell>
+                    ))}
+                  </TableRow>
+                ))}
+              </TableHead>
+              <TableBody>
+                {table.getRowModel().rows.map((row) => (
+                  <TableRow key={row.id}>
+                    {row.getVisibleCells().map((cell) => (
+                      <TableCell key={cell.id} size="small">
+                        {flexRender(cell.column.columnDef.cell, cell.getContext())}
+                      </TableCell>
+                    ))}
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </TableContainer>
+          <TablePagination
+            rowsPerPageOptions={[5, 10, 25, { label: 'All', value: data.length }]}
+            component="div"
+            count={table.getFilteredRowModel().rows.length}
+            rowsPerPage={pageSize}
+            page={pageIndex}
+            SelectProps={{
+              inputProps: { 'aria-label': 'rows per page' },
+              native: true,
+            }}
+            onPageChange={(_, page) => {
+              table.setPageIndex(page)
+            }}
+            onRowsPerPageChange={e => {
+              const size = e.target.value ? Number(e.target.value) : 10
+              table.setPageSize(size)
+            }}
+            ActionsComponent={TablePaginationActions}
+          />
+
+          <pre>
+            {JSON.stringify(table.getState().pagination, null, 2)}
+          </pre>
+        </>
+      )
+    }
+
+    /************************************************************************
+      pages
+     ************************************************************************/
+    const PageAccount = () => {
+      const { useRecoilState } = Recoil
+      const { Card, CardHeader, CardContent } = MaterialUI
+
+      const [user] = useRecoilState(userState)
+
+      return (
+        <Card>
+          <CardHeader title="アカウント情報" ></CardHeader>
+          <CardContent>
+            <pre>
+              {JSON.stringify(user?.payload, null, 2)}
+            </pre>
+          </CardContent>
+        </Card >
+      )
+    }
+
+    const PageDashboard = () => {
+      const { useState, useEffect, useMemo } = React
+      const { Box } = MaterialUI
+      const { data, isLoading, error } = useFetchUsers()
+
+      const columns = useMemo(() => [
+        { accessorKey: 'id', header: 'First Name', size: 150, },
+        { accessorKey: 'name', header: 'Last Name', size: 150, },
+        { accessorKey: 'username', header: 'Address', size: 200, },
+        { accessorKey: 'email', header: 'City', size: 150, },
+      ], [])
+
+      if (isLoading) return 'Loading...'
+      if (error) return 'An error has occurred: ' + error.message
+
+      return (
+        <Box sx={{ width: '100%' }}>
+          <h2>ユーザ一覧サンプル</h2>
+          < BasicTable columns={columns} data={data} />
+        </Box>
+      )
+    }
+
+    const PageLogin = () => {
+      const { useState } = React
+      const { useNavigate } = ReactRouterDOM
+      const { useForm } = ReactHookForm
+      const { useRecoilState } = Recoil
+      const { Container, Alert, Stack, Card, CardHeader, CardContent, CardActions, Button, Typography, TextField } = MaterialUI
+
+      const [user, setUser] = useRecoilState(userState)
+      const [alert, setAlert] = useState(null)
+      const navigate = useNavigate()
+      const { signIn } = useCognito()
+      const { loadStorage, saveStorage } = useLocalStorage()
+
+      const defaultValues = loadStorage()
+      const { register, handleSubmit, reset } = useForm({ defaultValues })
+
+      const onSubmit = async (data) => {
+        try {
+          const res = await signIn(data.username, data.password)
+          var idToken = res.getIdToken()
+          //console.log(idToken.getJwtToken())
+          setUser({ payload: idToken.payload, token: idToken.getJwtToken() })
+          saveStorage({ username: data.username, password: data.password })
+          navigate('/account')
+        } catch (error) {
+          const { name, message } = error
+          switch (name) {
+            case 'UserNotFoundException':
+            case 'NotAuthorizedException':
+              setAlert({ severity: 'error', message: 'ユーザー名またはパスワードが違います。' })
+              break
+            default:
+              setAlert({ severity: 'error', message: name + ' : ' + message })
+          }
+        }
+      }
+
+      return (
+        <Container>
+          {alert && (
+            <Alert severity={alert.severity} onClose={() => { setAlert(null) }}>
+              {alert.message}
+            </Alert>
+          )}
+          <Card sx={{ p: 4, width: '480px', m: '20px auto' }}>
+            <CardHeader title="ログイン" subheader="ID/PASSを保存するので、共有PCでの利用不可"></CardHeader>
+            <form onSubmit={handleSubmit(onSubmit)}>
+              <CardContent>
+                <Stack spacing={3}>
+                  <TextField label="ユーザーID" type="username" size="small" {...register('username')} />
+                  <TextField label="パスワード" type="password" size="small" {...register('password')} />
+                  <Button type="submit" color="primary" variant="contained" size="large">
+                    ログイン
+                  </Button>
+                </Stack>
+              </CardContent>
+            </form>
+          </Card >
+        </Container>
+      )
+    }
+
+    /************************************************************************
+      layouts
+     ************************************************************************/
+    const LayoutMain = () => {
+      const { useState, useEffect } = React
+      const { Outlet, Link, useNavigate, useLocation } = ReactRouterDOM
+      const { useRecoilState } = Recoil
+      const { Container, AppBar, Toolbar, Divider, Box, Drawer } = MaterialUI
+      const { List, ListItem, ListItemIcon, ListItemButton, ListItemText, Typography, Icon, Button, Menu, MenuItem } = MaterialUI
+
+      const [user, setUser] = useRecoilState(userState)
+      const drawerWidth = 240
+      const navigate = useNavigate()
+      const { signOut } = useCognito()
+
+      const menu = [
+        { id: "account", name: "アカウント情報", icon: 'account_circle', to: "/account" },
+        { id: "dashboard", name: "ダッシュボード", icon: 'dashboard', to: "/dashboard" }
+      ]
+
+      const [anchorEl, setAnchorEl] = useState(null)
+      const { pathname } = useLocation()
+
+      const handleMenu = (event) => {
+        setAnchorEl(event.currentTarget)
+      }
+
+      const handleClose = () => {
+        setAnchorEl(null)
+      }
+
+      const handleSignOut = async () => {
+        signOut()
+        navigate('/')
+      }
+
+      useEffect(() => {
+        if (!user.token) {
+          navigate('/')
+        }
+      }, [])
+
+      if (!user.token) return (<></>)
+
+      return (
+        <Box sx={{ display: 'flex' }}>
+          <AppBar position="fixed" sx={{ zIndex: (theme) => theme.zIndex.drawer + 1 }}>
+            <Toolbar>
+              <Typography variant="h6" component="div" sx={{ flexGrow: 1 }}>
+                {AppName}
+              </Typography>
+              <Typography variant="h6" component="div">
+                {user?.payload.email}
+              </Typography>
+              {
+                <div>
+                  <Button size="large" onClick={handleMenu} color="inherit">
+                    <Icon>account_circle</Icon>
+                  </Button>
+                  <Menu id="menu-appbar" anchorEl={anchorEl} open={Boolean(anchorEl)} onClose={handleClose}>
+                    <MenuItem onClick={handleSignOut}>ログアウト</MenuItem>
+                  </Menu>
+                </div>
+              }
+            </Toolbar>
+          </AppBar>
+          <Drawer variant="permanent" sx={{
+            width: drawerWidth, flexShrink: 0,
+            [`& .MuiDrawer - paper`]: { width: drawerWidth, boxSizing: 'border-box' }
+          }}
+          >
+            <Toolbar />
+            <Box sx={{ overflow: 'auto' }}>
+              <List disablePadding>
+                {menu.map(({ id, name, to, icon }) => (
+                  <ListItem disablePadding key={id}>
+                    <ListItemButton component={Link} to={to} selected={to === pathname}>
+                      <ListItemIcon><Icon>{icon}</Icon></ListItemIcon>
+                      <ListItemText>{name}</ListItemText>
+                    </ListItemButton>
+                  </ListItem>
+                ))}
+              </List>
+            </Box>
+          </Drawer>
+          <Container>
+            <Box component="main" sx={{ flexGrow: 1, p: 3 }}>
+              <Toolbar />
+              <Outlet />
+            </Box>
+          </Container>
+        </Box>
+      )
+    }
+
+    const App = () => {
+      const { useState } = React
+      const { HashRouter, Routes, Link, Route } = ReactRouterDOM
+      const { RecoilRoot } = Recoil
+      const { createTheme, ThemeProvider, CssBaseline, colors } = MaterialUI
+      const { QueryClient, QueryClientProvider } = ReactQuery
+
+      const queryClient = new QueryClient()
+      const theme = createTheme({
+        palette: {
+          primary: { main: '#002b62' },
+          secondary: { main: '#19857b' },
+          background: { default: '#f5f5f5' },
+          error: { main: colors.red.A400 }
+        }
+      })
+
+      return (
+        <React.StrictMode>
+          <QueryClientProvider client={queryClient}>
+            <RecoilRoot>
+              <ThemeProvider theme={theme}>
+                <CssBaseline />
+                <HashRouter>
+                  <Routes>
+                    <Route path="/" element={<PageLogin />} />
+                    <Route element={<LayoutMain />}>
+                      <Route path="/account" element={<PageAccount />} />
+                      <Route path="/dashboard" element={<PageDashboard />} />
+                    </Route>
+                  </Routes>
+                </HashRouter>
+              </ThemeProvider>
+            </RecoilRoot>
+          </QueryClientProvider>
+        </React.StrictMode>
+      )
+    }
+    const container = document.getElementById('app')
+    const root = ReactDOM.createRoot(container)
+    root.render(<App />)
+  </script>
+</body>
+</html>

@@ -1,0 +1,90 @@
+<!DOCTYPE html>
+<html lang="ja">
+
+<!--
+MUI + TanStack Query(React Query)を使ってみた。
+まだバリデーションなし
+-->
+
+<head>
+  <title>ReactCDN</title>
+  <meta charset="utf-8">
+  <meta name="viewport" content="initail-scale=1, width=device-width">
+  <script src="https://unpkg.com/react@18/umd/react.development.js" crossorigin="anonymous"></script>
+  <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+  <script src="https://unpkg.com/@mui/material@latest/umd/material-ui.development.js" crossorigin="anonymous"></script>
+  <script src='https://unpkg.com/react-router-dom@5/umd/react-router-dom.min.js'></script>
+  <script src="https://unpkg.com/@tanstack/react-query@4/build/umd/index.production.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js" crossorigin="anonymous"></script>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,400,500,700&display=swap" />
+  <link rel="stylesheet" href="https://fonts.googleapis.com/icon?family=Material+Icons">
+</head>
+
+<body>
+  <div id="app"></div>
+  <script type="text/babel">
+    const fetcher = url => axios.get(url).then(res => res.data)
+
+    const useFetchUsers = () => {
+      const { useQuery } = ReactQuery
+      return useQuery({
+        queryKey: ['users'],
+        queryFn: async () => fetcher('https://jsonplaceholder.typicode.com/users')
+      })
+    }
+
+    const Main = () => {
+      const { useState, useEffect } = React
+      const { data: users, isLoading, error } = useFetchUsers()
+
+      if (isLoading) return 'Loading...'
+      if (error) return 'An error has occurred: ' + error.message
+
+      return (
+        <>
+          <h2>ユーザ一覧</h2>
+          {users.map((user) => (
+            <div key={user.id}>{user.name}</div>
+          ))}
+        </>
+      );
+    }
+
+    const App = () => {
+      const { HashRouter, Switch, Link, Route } = ReactRouterDOM
+      const { QueryClient, QueryClientProvider } = ReactQuery
+      const { createTheme, ThemeProvider, CssBaseline } = MaterialUI
+
+      const queryClient = new QueryClient()
+
+      let theme = createTheme({
+        palette: {
+          primary: {
+            light: '#63ccff',
+            main: '#009be5',
+            dark: '#006db3',
+          },
+          background: {
+            default: '#f5f5f5',
+          },
+        }
+      })
+      return (
+        <React.StrictMode>
+          <QueryClientProvider client={queryClient}>
+            <ThemeProvider theme={theme}>
+              <CssBaseline />
+              <Main />
+            </ThemeProvider >
+          </QueryClientProvider>
+        </React.StrictMode>
+      )
+    }
+    const container = document.getElementById('app')
+    const root = ReactDOM.createRoot(container)
+    root.render(<App />)
+  </script>
+</body>
+
+</html>

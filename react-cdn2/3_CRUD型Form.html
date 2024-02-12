@@ -1,0 +1,212 @@
+<!DOCTYPE html>
+<html lang="ja">
+
+<!--
+　以下の例のまま。
+  https://tech.crassone.jp/posts/mui5-react-hook-form7
+  useFieldArray のサンプル
+  CDN版の ErrorMessage が取れないので自前で実装
+-->
+
+<head>
+  <title>ReactCDN</title>
+  <meta charset="utf-8">
+  <meta name="viewport" content="initail-scale=1, width=device-width">
+  <script src="https://unpkg.com/react@18/umd/react.development.js" crossorigin="anonymous"></script>
+  <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+  <script src="https://unpkg.com/@mui/material@latest/umd/material-ui.development.js" crossorigin="anonymous"></script>
+  <script src="https://cdn.jsdelivr.net/npm/react-hook-form@7/dist/index.umd.min.js"></script>
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js" crossorigin="anonymous"></script>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,400,500,700&display=swap" />
+  <link rel="stylesheet" href="https://fonts.googleapis.com/icon?family=Material+Icons">
+</head>
+
+<body>
+  <div id="app"></div>
+
+  <script type="text/babel">
+    const ErrorMessage = (props) => {
+      const isError = (root, name) => {
+        let a = root, b, path = name.split(".")
+        for (b in path) {
+          if (a === undefined) break
+          if (!a[path[b]]) { a = undefined; break }
+          a = a[path[b]]
+        }
+        return a
+      }
+      //console.log(props.name, isError(props.errors, props.name))
+
+      return (
+        <>
+          {isError(props.errors, props.name) && <p>{props.message}</p>}
+        </>
+      )
+    }
+
+    const TotalAmount = ({ control }) => {
+      const { useWatch } = ReactHookForm
+      const { Typography } = MaterialUI
+      const formValues = useWatch({
+        // useWatch 関数は　items を監視しその値を返す
+        name: "items",
+        control
+      });
+      const total = formValues.reduce(
+        (acc, { price, quantity }) => acc + Math.floor((price || 0) * (quantity || 0)), 0
+      );
+
+      const tax = Math.floor(total * 0.1);
+      return (
+        <Typography mt={4}>
+          合計: {total + tax}円<small>(税{tax}円)</small>
+        </Typography>
+      );
+    }
+
+    const App = () => {
+      const { useState, useEffect, Fragment } = React
+      const { useForm, Controller, useFieldArray } = ReactHookForm
+      const { Container, Stack, Card, CardHeader, CardContent, CardActions, Button, Typography } = MaterialUI
+      const { TextField, Box, IconButton, Icon } = MaterialUI
+      const { FormControl, Checkbox } = MaterialUI
+      const {
+        // register 関数はinput/select の Ref とバリデーションルールを React Hook Form に登録 (register)
+        register,
+
+        // reset 関数はフォーム内のフィールドの値とエラーをリセットできる
+        reset,
+        control,
+
+        // handleSubmit 関数はバリデーションに成功するとフォームデータを渡す
+        handleSubmit,
+
+        // errors オブジェクトには、各 input のフォームのエラーまたはエラーメッセージが含まれる
+        // バリデーションとエラーメッセージで登録するとエラーメッセージが返される
+        formState: { errors }
+      } = useForm({
+        // defaultValues を省略可能な引数として渡してフォーム全体のデフォルト値を設定し、fields 配列に値を格納
+        // defaultValues はカスタムフック内にキャッシュされる
+        // defaultValues は reset API でリセットできる
+        defaultValues: {
+          name: "",
+          items: [{ name: "", quantity: 0, price: 0 }]
+        },
+
+        // blur イベントからバリデーションがトリガーされる
+        mode: "onBlur"
+      });
+
+      // useFieldArray に name と control を渡すことで、MUI の TextField への入力値を取得できるようになる
+      const { fields, append, remove } = useFieldArray({
+        name: "items",
+        control
+      });
+
+      const onSubmit = (data) => console.log(data)
+
+      return (
+        <Container maxWidth="sm" sx={{ pt: 5 }}>
+          {/* Stack コンポーネントは MUI v5 で追加された新しいコンポーネント https://mui.com/components/stack/ */}
+          <Stack spacing={2}>
+            <TextField
+              label="商品名カテゴリ"
+              // name 属性は必須かつ unique
+              {...register("name", {
+                required: true
+              })}
+              size="small"
+            />
+            <Box color="error.main" fontSize={12}>
+              <ErrorMessage errors={errors} name="name" as="p" message="⚠ 商品カテゴリを入力してください" />
+            </Box>
+            {fields.map((field, index) => {
+              return (
+                // 必ず fields オブジェクトの id をコンポーネントの key に割り当てる
+                <React.Fragment key={field.id}>
+                  <Box display="flex">
+                    <TextField
+                      sx={{ mr: 2, flex: 3 }}
+                      size="small"
+                      label="商品名"
+                      // arrays/array フィールドを使用する場合、input の name 属性を name[index] のように割り当てることができる
+                      {...register(`items.${index}.name`, {
+                        required: true
+                      })}
+                    />
+                    <TextField
+                      sx={{ mr: 2, flex: 1 }}
+                      size="small"
+                      type="number"
+                      label="単価"
+                      {...register(`items.${index}.price`, {
+                        min: 1,
+                        max: 10000
+                      })}
+                    />
+                    <TextField
+                      sx={{ mr: 1, flex: 1 }}
+                      size="small"
+                      type="number"
+                      label="数量"
+                      {...register(`items.${index}.quantity`, {
+                        // input が受け付ける最小文字数と最大文字数を設定
+                        min: 1,
+                        max: 100
+                      })}
+                    />
+
+                    {/* remove 関数は特定の位置の input を削除、位置を指定しない場合は全てを削除 */}
+                    <IconButton aria-label="delete" onClick={() => remove(index)}>
+                      <Icon>deleteOutline</Icon>
+                    </IconButton>
+                  </Box>
+                  <Box color="error.main" fontSize={12}>
+                    {/* ErrorMessage コンポーネントは name 属性で関連付けされた入力のエラーメッセージを表示するためのシンプルなコンポーネント */}
+                    <ErrorMessage
+                      errors={errors}
+                      name={`items.${index}.name`}
+                      message="⚠ 商品名を入力してください"
+                      as="p"
+                    />
+                    <ErrorMessage
+                      errors={errors}
+                      name={`items.${index}.price`}
+                      message="⚠ 単価欄に1~10000の数字を入力してください"
+                      as="p"
+                    />
+                    <ErrorMessage
+                      errors={errors}
+                      name={`items.${index}.quantity`}
+                      message="⚠ 数量欄に1~100の数字を入力してください"
+                      as="p"
+                    />
+                  </Box>
+                </React.Fragment>
+              );
+            })}
+          </Stack>
+          <Button sx={{ mt: 1 }} startIcon={<Icon>add</Icon>} onClick={() => append({ name: "", quantity: 0, price: 0 })}>
+            行を追加する
+          </Button>
+          <Box textAlign="center" mt={2}>
+            <Button variant="outlined" sx={{ mr: 1 }} onClick={() => reset({ name: "", items: [{ name: "", quantity: 0, price: 0 }] })}>
+              リセット
+            </Button>
+            <Button color="primary" variant="contained" disableElevation onClick={handleSubmit(onSubmit)}>
+              送信
+            </Button>
+          </Box>
+          <Box textAlign="right">
+            <TotalAmount control={control} />
+          </Box>
+        </Container>
+      )
+    }
+    const container = document.getElementById('app')
+    const root = ReactDOM.createRoot(container)
+    root.render(<App />)
+  </script>
+</body>
+
+</html>

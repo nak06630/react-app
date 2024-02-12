@@ -1,0 +1,242 @@
+<!DOCTYPE html>
+<html lang="ja">
+<!--
+テンプレートだけですべての設定入力フォームを作るサンプル
+　React + React Router + MUI + React Hook Form (yupなし)
+  text, radioのみ
+-->
+<head>
+  <title>ReactCDN</title>
+  <meta charset="utf-8">
+  <meta name="viewport" content="initail-scale=1, width=device-width">
+  <script src="https://unpkg.com/react@18/umd/react.development.js" crossorigin="anonymous"></script>
+  <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+  <script src="https://unpkg.com/@mui/material@latest/umd/material-ui.development.js" crossorigin="anonymous"></script>
+  <script src="https://cdn.jsdelivr.net/npm/react-hook-form@7/dist/index.umd.min.js"></script>
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js" crossorigin="anonymous"></script>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,400,500,700&display=swap" />
+  <link rel="stylesheet" href="https://fonts.googleapis.com/icon?family=Material+Icons">
+</head>
+<body>
+  <div id="app"></div>
+  <script type="text/babel">
+
+    const template = {
+      title: 'ConfigTemplate',
+      // ページ定義
+      //  sample: {
+      //    type: 'text', // 入力形式
+      //    key: 'hostname', // jsonの該当する値（階層構造にはできません）
+      //    name: '装置名', // 項目名
+      //    default: '', // デフォルト値（現在動作させていない）
+      //    rules: 'required', // バリデーションルール
+      //    show: {}, // 表示条件を付けたい場合はshow
+      //    items: {} // selectの場合はitems
+      //  },
+      pages: {
+        misc: {
+          title: 'その他',
+          subheader: 'サンプル',
+          sections: [
+            {
+              section_name: 'Sample',
+              items: [
+                {
+                  type: 'text',
+                  key: 'misc.name',
+                  name: '名前',
+                  default: '',
+                  rules: "required|min:2"
+                },
+                {
+                  type: 'number',
+                  key: 'misc.number',
+                  name: '数字',
+                  default: '',
+                  rules: "required|min_value:0,max_value:32"
+                },
+                {
+                  type: 'radio',
+                  key: 'misc.radio',
+                  name: '選択',
+                  default: 'a',
+                  items: [
+                    { text: 'Aの選択肢', value: 'a' },
+                    { text: 'Bの選択肢', value: 'b' },
+                    { text: 'Cの選択肢', value: 'c' }
+                  ]
+                }
+              ]
+            }
+          ]
+        }
+      },
+    }
+
+    // 装置から読み込む現在の状態とコンフィグ
+    const host = {
+      config: {
+        misc: {
+          name: 'aaa',
+          number: '1',
+          radio: 'b'
+        }
+      }
+    }
+
+    function Login() {
+      return <h1>Login</h1>
+    }
+
+    function NTextField(props) {
+      const { Controller } = ReactHookForm
+      const { TextField } = MaterialUI
+      const { item, control } = props
+
+      const getRules = (item) => {
+        const rules = {}
+        if (item.rules?.match(/required/)) {
+          rules.required = '入力してください。'
+        }
+        return rules
+      }
+
+      return (
+        <Controller name={item.key} control={control} rules={getRules(item)} render={({ field, fieldState }) => (
+          <TextField fullWidth
+            type={item.type}
+            size="small"
+            label={item.name}
+            error={fieldState.invalid}
+            helperText={fieldState.error?.message}
+            {...field}
+          />
+        )} />
+      )
+    }
+
+    function NRadio(props) {
+      const { Controller } = ReactHookForm
+      const { RadioGroup, Radio, FormControl, FormLabel, FormControlLabel } = MaterialUI
+      const { item, control } = props
+
+      return (
+        <Controller name={item.key} control={control} render={({ field }) => (
+          <FormControl fullWidth>
+            {/*<FormLabel id={item.key}>{item.name}</FormLabel>*/}
+            <RadioGroup row aria-labelledby={item.key} name={item.name} {...field}>
+              {item.items.map((i) => (
+                <FormControlLabel
+                  key={i.value}
+                  control={
+                    <Radio />
+                  }
+                  value={i.value} label={i.text}
+                />
+              ))}
+            </RadioGroup>
+          </FormControl>
+        )} />
+      )
+    }
+
+    function ConfigPage({ page }) {
+      const { useState, useLayoutEffect, Fragment } = React
+      const { useForm, Controller, useWatch } = ReactHookForm
+      const { Grid, Stack, Card, CardHeader, CardContent, CardActions, Button, Typography } = MaterialUI
+      const { FormControl, Checkbox } = MaterialUI
+
+      const [t, SetTemplate] = useState(template.pages[page])
+      const [c, SetConfig] = useState(host.config)
+
+      const defaultValues = {}
+      for (const page of Object.keys(c)) {
+        for (const item of Object.keys(c[page])) {
+          // console.log(`${page}.${item} = ${host.config[page][item]}`)
+          defaultValues[`${page}.${item}`] = c[page][item]
+        }
+      }
+      const { control, watch, handleSubmit, reset } = useForm({ defaultValues })
+      const onSubmit = data => alert(JSON.stringify(data[page], null, 2))
+
+      useLayoutEffect(() => {
+        SetTemplate(template.pages[page])
+        reset()
+      }, [page])
+
+      return (
+        <Card>
+          <form onSubmit={handleSubmit(onSubmit)}>
+            <CardContent>
+              {t.sections.map((section) => (
+                <Fragment key={section.section_name}>
+                  <Typography variant="h5" sx={{ fontWeight: 'bold', py: 5 }}>{section.section_name}</Typography>
+                  <Stack spacing={2}>
+                    {section.items.map((item, i) => (
+                      <Fragment key={i}>
+                        {/* text　でも show.key で記載されている項目が、show.value でなかったら表示しない */}
+                        {(item.type === 'text' || item.type === 'number') &&
+                          ((item.show && watch(item.show.key) == item.show.value) || !item.show) &&
+                          <Grid container>
+                            <Grid item xs={4}><Typography variant="body1">{item.name}</Typography></Grid>
+                            <Grid item xs={8}><NTextField item={item} control={control} /></Grid>
+                          </Grid>
+                        }
+                        {item.type === 'radio' &&
+                          ((item.show && watch(item.show.key) == item.show.value) || !item.show) &&
+                          <Grid container>
+                            <Grid item xs={4}><Typography variant="body1">{item.name}</Typography></Grid>
+                            <Grid item xs={8}><NRadio item={item} control={control} /></Grid>
+                          </Grid>
+                        }
+                      </Fragment>
+                    ))}
+                  </Stack>
+                </Fragment>
+              ))}
+            </CardContent>
+            <CardActions>
+              {!t.readonly &&
+                <>
+                  <Button variant="contained" type="submit">
+                    設定
+                  </Button>
+                  <Button variant="contained" color="inherit" onClick={() => reset(defaultValues)} >
+                    キャンセル
+                  </Button>
+                </>
+              }
+            </CardActions>
+          </form>
+        </Card>
+      )
+    }
+
+    const App = () => {
+      const { useState } = React
+      const { createTheme, ThemeProvider, CssBaseline, Container } = MaterialUI
+
+      const [t, SetTemplate] = useState(template)
+
+      const theme = createTheme({
+        palette: {
+          primary: { light: '#63ccff', main: '#009be5', dark: '#006db3' },
+          background: { default: '#f5f5f5' },
+        }
+      })
+
+      return (
+        <ThemeProvider theme={theme}>
+          <CssBaseline />
+          <Container sx={{ p: 2 }}>
+            <ConfigPage page="misc" />
+          </Container>
+        </ThemeProvider>
+      )
+    }
+    const container = document.getElementById('app')
+    const root = ReactDOM.createRoot(container)
+    root.render(<App />)
+  </script>
+</body>
+</html>

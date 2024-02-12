@@ -1,0 +1,583 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <title>ReactCDN</title>
+  <meta charset="utf-8">
+  <meta name="viewport" content="initail-scale=1, width=device-width">
+  <script src="https://unpkg.com/react@18/umd/react.development.js" crossorigin="anonymous"></script>
+  <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/react-hook-form@7/dist/index.umd.min.js"></script>
+  <script src="https://unpkg.com/@mui/material@latest/umd/material-ui.development.js" crossorigin="anonymous"></script>
+  <script src='https://unpkg.com/react-router-dom@5/umd/react-router-dom.min.js'></script>
+  <script src="https://unpkg.com/@tanstack/react-query@4/build/umd/index.production.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@tanstack/react-table@8.7.0/build/umd/index.development.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js" crossorigin="anonymous"></script>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,400,500,700&display=swap" />
+  <link rel="stylesheet" href="https://fonts.googleapis.com/icon?family=Material+Icons">
+</head>
+<body>
+  <div id="app"></div>
+  <script type="text/babel">
+
+    /* コンフィグ例 */
+    const config = `
+interface Vlan-interface1
+  ip address 192.168.1.1 24
+
+radius scheme rs1
+  primary authentication 192.168.1.2
+  primary accounting 192.168.1.2
+  key authentication simple secret
+  key accounting simple secret
+
+domain local.com
+  authentication default radius-scheme rs1
+  authorization default radius-scheme rs1
+  accounting default radius-scheme rs1
+  quit
+
+domain default enable local.com
+`.trim()
+
+    /* コマンドリスト構成 */
+    const commandList = {
+      global: [
+        'domain default enable'
+      ],
+      interface: [
+        'ip address'
+      ],
+      'radius scheme': [
+        'primary authentication',
+        'primary accounting',
+        'key authentication',
+        'key accounting'
+      ],
+      domain: [
+        'authentication default radius-scheme',
+        'authorization default radius-scheme',
+        'accounting default radius-scheme',
+      ]
+    }
+
+    /**
+     * コンフィグパーサ
+     * @param {object} rawconfig - QX config
+     * @returns {object} parsedconfig - QX parsed config =
+     * {
+     *   "radius scheme": [
+     *     {
+     *       "key": "radius scheme rs1",
+     *       "cmds": [
+     *         { "key": "primary authentication", "cmd": "primary authentication 192.168.1.2" },
+     *         { "key": "primary accounting", "cmd": "primary accounting 192.168.1.2" },
+     *         { "key": "key authentication", "cmd": "key authentication simple secret" },
+     *         { "key": "key accounting", "cmd": "key accounting simple secret" }
+     *       ]
+     *     },
+     *     ...
+     *   ],
+     *   ...
+     * }
+    */
+    const parse = (rawconfig) => {
+
+      /* グローバルコンフィグは global モードと表現する。 */
+      let parsedconfig = {
+        "global": [{ key: 'global', cmds: {} }]
+      }
+
+      /* 現在行のモード */
+      let current_mode = { mode: 'global', line: 'global' }
+      /* 現在行が単純なコマンドなら true、モードコンフィグならfalse */
+      let isCommand = false
+
+      /* コンフィグを１行ずつ解析 */
+      for (let line of rawconfig.split('\n')) {
+        // 空行があったらモードリセット
+        if (!line) current_mode = { mode: 'global', line: 'global' }
+
+        // コマンドチェック（グローバルコンフィグの判定のため、モードより先に判定が必要）
+        for (let cmd of commandList[current_mode.mode]) {
+          if (new RegExp(cmd).test(line)) {
+            // console.log("mode=", current_mode, "cmd=", { cmd: cmd, params: line })
+            const index = parsedconfig[current_mode.mode].findIndex(e => e.key === current_mode.line)
+            if (index !== -1) {
+              parsedconfig[current_mode.mode][index]['cmds'][cmd] = line.trim()
+            }
+            isCommand = true
+          }
+        }
+
+        // コマンドであれば、モードチェックはしない。
+        if (isCommand) { isCommand = false; continue }
+
+        // モードチェック
+        Object.keys(commandList).map((mode) => {
+          if (new RegExp(mode).test(line)) {
+            current_mode = { mode, line }
+            if (!parsedconfig[current_mode.mode]) {
+              parsedconfig[current_mode.mode] = [{ key: current_mode.line, cmds: {} }]
+            } else {
+              parsedconfig[current_mode.mode].push({ key: current_mode.line, cmds: {} })
+            }
+            // console.log("mode=", line)
+          }
+        })
+      }
+
+      return parsedconfig
+    }
+
+
+    /* Textarea */
+    const blue = { 200: '#b6daff', 400: '#3399FF' }
+    const grey = { 50: '#f6f8fa', 200: '#d0d7de', 900: '#24292f' }
+    const { styled, TextareaAutosize } = MaterialUI
+
+    /* Textarea のコンポーネントの中にいれないこと（1文字入力でフォーカスが外れるようになるので） */
+    const StyledTextarea = styled(TextareaAutosize)(({ theme }) => `
+      width: 100%;
+      font-family: sans-serif;
+      font-size: 0.875rem;
+      font-weight: 400;
+      line-height: 1.2;
+      padding: 12px;
+      border-radius: 5px;
+      color: ${grey[900]};
+      background: ${'#fff'};
+      border: 1px solid ${grey[200]};
+      box-shadow: 0px 2px 2px ${grey[50]};        
+      &:hover {
+        border-color: ${blue[400]};
+      }
+      &:focus {
+        border-color: ${blue[400]};
+        box-shadow: 0 0 0 3px ${blue[200]};
+      }
+      // firefox
+      &:focus-visible {
+        outline: 0;
+      }
+    `)
+
+    const Textarea = (props) => {
+      const { FormHelperText } = MaterialUI
+      const { inputRef, value, onChange, onBlur, ...rest } = props
+
+      return (
+        <>
+          <StyledTextarea ref={inputRef} value={value} onChange={onChange} onBlur={onBlur} {...rest} spellCheck={false} />
+          {!!props.error && <FormHelperText error>{props.error.message}</FormHelperText>}
+        </>
+      )
+    }
+
+    const RhfTextarea = (props) => {
+      const { useController } = ReactHookForm
+      const { name, control, placeholder, rules, ...restprops } = props
+      const { field: { ref, ...restfield }, formState: { errors } } = useController({ name, control, rules })
+      return (
+        <Textarea inputRef={ref} placeholder={placeholder} {...restprops} {...restfield} error={errors[name]} />
+      )
+    }
+
+    /* ErrorMessage of RHF */
+    const ErrorMessage = (props) => {
+      const isError = (root, name) => {
+        let a = root, b, path = name.split(".")
+        for (b in path) {
+          if (a === undefined) break
+          if (!a[path[b]]) { a = undefined; break }
+          a = a[path[b]]
+        }
+        return a
+      }
+      //console.log(props.name, isError(props.errors, props.name))
+
+      return (
+        <>
+          {isError(props.errors, props.name) && <p>{props.message}</p>}
+        </>
+      )
+    }
+
+    /**
+     * step1: コンフィグ読み込み
+     */
+    const LoadConfig = (props) => {
+      const { useState, useEffect } = React
+      const { useForm, useController } = ReactHookForm
+      const [defaultValues, setDefaultValues] = useState({ input: config })
+      const { Card, CardHeader, CardContent, CardActions, Button } = MaterialUI
+
+      const { control, handleSubmit, setError, reset, formState: { isValid } } = useForm({ mode: 'onChange', dafaultValues: { input: config } })
+      const { field: { ref, ...rest }, formState: { errors }, } = useController({ name, control })
+
+      useEffect(() => {
+        reset(defaultValues)
+      }, [defaultValues])
+
+      const onSubmit = data => {
+        console.log("[step1]\n", JSON.stringify(parse(data.input), null, 2))
+        props.setFormValue({ ...props.formValue, parsedconfig: parse(data.input) })
+        props.handleNext()
+      }
+
+      return (
+        <Card elevation={0}>
+          <form onSubmit={handleSubmit(onSubmit)}>
+            <CardHeader title="コンフィグ入力" subheader="Radius関連のコンフィグを入力してください。（コンフィグ取得のかわり）" />
+            <CardContent>
+              <RhfTextarea name="input" rules={{ required: '入力してください。' }} control={control} />
+            </CardContent>
+            <CardActions>
+              <Button variant="contained" type="submit">
+                設定
+              </Button>
+            </CardActions>
+          </form>
+        </Card >
+      )
+    }
+
+    /**
+     * step2: GUI for Radius 
+     * @param {object} props - { formValue: 全ページのformの値, setFormValue: 全ページのFormの設定, handleNext: 次のステップ }
+     */
+    const GUI = (props) => {
+      const { useForm, Controller, useFieldArray } = ReactHookForm
+      const { Box, Card, CardHeader, CardContent, CardActions, Stack } = MaterialUI
+      const { Typography, TextField, Button, IconButton, Icon } = MaterialUI
+
+      /**
+        * Radius デフォルトパラメータ取得
+        * @params {object} config
+        * "radius scheme": [
+        *   {
+        *     "key": "radius scheme rs1",
+        *     "cmds": [
+        *       { "primary authentication": "primary authentication 192.168.1.2" },
+        *       { "primary accounting": "primary accounting 192.168.1.2" },
+        *       { "key authentication": "key authentication simple secret" },
+        *       { "key accounting": "key accounting simple secret" }
+        *     ]
+        *   }
+        * }
+        * 
+        */
+      const get_radius_config = (config) => {
+        return {
+          domain_default_enable: config["global"][0].cmds['domain default enable']?.split(' ')[3], // domain default enable local.com
+          radius_scheme: config["radius scheme"]?.map((e) => {
+            return ({
+              0: e.key?.split(' ')[2],                            // radius scheme rs1
+              1: e.cmds['primary authentication']?.split(' ')[2], // primary authentication 192.168.1.2
+              2: e.cmds['primary accounting']?.split(' ')[2],     // primary accounting 192.168.1.2
+              3: e.cmds['key authentication']?.split(' ')[3],     // key authentication simple secret
+              4: e.cmds['key accounting']?.split(' ')[3]          // key accounting simple secret
+            })
+          }),
+          domain: config["domain"]?.map((e) => {
+            return ({
+              0: e.key?.split(' ')[1],                                          // domain local.com
+              1: e.cmds['authentication default radius-scheme']?.split(' ')[3], // authentication default radius-scheme rs1
+              2: e.cmds['authorization default radius-scheme']?.split(' ')[3],  // authorization default radius-scheme rs1
+              3: e.cmds['accounting default radius-scheme']?.split(' ')[3]      // accounting default radius-scheme rs1
+            })
+          })
+        }
+      }
+      const defaltValues = get_radius_config(props.formValue.parsedconfig)
+
+      /* バリデーション */
+      const getRules = (item) => {
+        const rules = {}
+        if (item.includes('required')) rules.required = '入力してください。'
+        if (item.includes('ip')) rules.pattern = {
+          value: /^((25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[1-9]?[0-9])\.){3}(25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[1-9]?[0-9])$/,
+          message: 'IPv4アドレスを入力してください'
+        }
+        return rules
+      }
+
+      const validateDomain = (value) => {
+        let isValid = false
+        getValues()["domain"]?.map((e) => {
+          if (e["0"] == value) isValid = true
+        })
+        return isValid
+      }
+
+      const validateScheme = (value) => {
+        let isValid = false
+        getValues()["radius_scheme"]?.map((e) => {
+          if (e["0"] == value) isValid = true
+        })
+        return isValid
+      }
+
+      const { register, reset, control, handleSubmit, getValues, formState: { errors } } = useForm({ defaultValues: defaltValues, mode: "onBlur" })
+      const { fields: fields1, append: append1, remove: remove1 } = useFieldArray({ name: "radius_scheme", control })
+      const { fields: fields2, append: append2, remove: remove2 } = useFieldArray({ name: "domain", control })
+
+      const onSubmit = (data) => {
+        console.log("[step2]\n", JSON.stringify(data, null, 2))
+        props.setFormValue({ ...props.formValue, radius: data })
+        props.handleNext()
+      }
+
+      return (
+        <Card elevation={0}>
+          <CardHeader title="Radius設定" subheader="" />
+
+          <CardContent>
+            <Stack spacing={2}>
+              <Typography>RADIUS スキーム設定</Typography>
+              {fields1.map((field, index) => {
+                return (
+                  <React.Fragment key={field.id}>
+                    <Box display="flex">
+                      <TextField sx={{ mr: 2, flex: 1 }} size="small" {...register(`radius_scheme.${index}.0`, { required: true })} label="スキーム" />
+                      <TextField sx={{ mr: 2, flex: 1 }} size="small" {...register(`radius_scheme.${index}.1`, getRules(["required", "ip"]))} label="プライマリ認証サーバ" />
+                      <TextField sx={{ mr: 2, flex: 1 }} size="small" {...register(`radius_scheme.${index}.2`, getRules(["required", "ip"]))} label="プライマリアカウンティングサーバ" />
+                      <TextField sx={{ mr: 2, flex: 1 }} size="small" {...register(`radius_scheme.${index}.3`, { required: true })} label="認証サーバキー" />
+                      <TextField sx={{ mr: 1, flex: 1 }} size="small" {...register(`radius_scheme.${index}.4`, { required: true })} label="アカウンティングサーバキー" />
+                      <IconButton aria-label="delete" color="primary" onClick={() => remove1(index)}>
+                        <Icon>delete_circle</Icon>
+                      </IconButton>
+                    </Box>
+                    <Box color="error.main" fontSize={12}>
+                      <ErrorMessage errors={errors} name={`radius_scheme.${index}.0`} message="⚠ スキームを入力してください。" as="p" />
+                      <ErrorMessage errors={errors} name={`radius_scheme.${index}.1`} message="⚠ プライマリ認証サーバにIPv4アドレスを入力してください。" as="p" />
+                      <ErrorMessage errors={errors} name={`radius_scheme.${index}.2`} message="⚠ プライマリアカウンティングサーバにIPv4アドレス を入力してください。" as="p" />
+                      <ErrorMessage errors={errors} name={`radius_scheme.${index}.3`} message="⚠ 認証サーバのキーを入力してください。" as="p" />
+                      <ErrorMessage errors={errors} name={`radius_scheme.${index}.4`} message="⚠ アカウンティングサーバのキーを入力してください。" as="p" />
+                    </Box>
+                  </React.Fragment>
+                )
+              })}
+            </Stack>
+            <IconButton aria-label="delete" color="primary" onClick={() => append1({ name: "", quantity: 0, price: 0 })} >
+              <Icon>add_circle</Icon>
+            </IconButton>
+          </CardContent>
+
+          <CardContent>
+            <Stack spacing={2}>
+              <Typography>認証ドメイン設定</Typography>
+              {fields2.map((field, index) => (
+                <React.Fragment key={field.id}>
+                  <Box display="flex">
+                    <TextField sx={{ mr: 2, flex: 1 }} size="small" {...register(`domain.${index}.0`, { required: true })} label="認証ドメイン" />
+                    <TextField sx={{ mr: 2, flex: 1 }} size="small" {...register(`domain.${index}.1`, { validate: validateScheme })} label="デフォルト認証スキーム" />
+                    <TextField sx={{ mr: 2, flex: 1 }} size="small" {...register(`domain.${index}.2`, { validate: validateScheme })} label="デフォルト認可スキーム" />
+                    <TextField sx={{ mr: 1, flex: 1 }} size="small" {...register(`domain.${index}.3`, { validate: validateScheme })} label="デフォルトアカウンティングスキーム" />
+                    <IconButton aria-label="delete" color="primary" onClick={() => remove2(index)}>
+                      <Icon>delete_circle</Icon>
+                    </IconButton>
+                  </Box>
+                  <Box color="error.main" fontSize={12}>
+                    <ErrorMessage errors={errors} name={`domain.${index}.0`} message="⚠ 認証ドメインを入力してください。" as="p" />
+                    <ErrorMessage errors={errors} name={`domain.${index}.1`} message="⚠ デフォルト認証スキームに有効なスキームを入力してください。" as="p" />
+                    <ErrorMessage errors={errors} name={`domain.${index}.2`} message="⚠ デフォルト認可スキームに有効なスキームを入力してください。" as="p" />
+                    <ErrorMessage errors={errors} name={`domain.${index}.3`} message="⚠ デフォルトアカウンティングスキームに有効なスキームを入力してください。" as="p" />
+                  </Box>
+                </React.Fragment>
+              ))}
+            </Stack>
+            <IconButton aria-label="delete" color="primary" onClick={() => append2({ name: "", quantity: 0, price: 0 })} >
+              <Icon>add_circle</Icon>
+            </IconButton>
+          </CardContent>
+
+          <CardContent>
+            <Stack spacing={2}>
+              <Typography>デフォルトドメイン設定</Typography>
+              <TextField size="small" {...register("domain_default_enable", { validate: validateDomain })} label="デフォルトドメイン" />
+              <Box color="error.main" fontSize={12}>
+                <ErrorMessage errors={errors} name="domain_default_enable" as="p" message="⚠ 有効なドメインを入力してください" />
+              </Box>
+            </Stack>
+          </CardContent>
+
+          <CardActions>
+            <Box textAlign="center" mt={2}>
+              <Button variant="outlined" sx={{ mr: 1 }} onClick={() => reset(defaltValues)} >
+                リセット
+              </Button>
+              <Button color="primary" variant="contained" disableElevation onClick={handleSubmit(onSubmit)}>
+                設定
+              </Button>
+            </Box>
+          </CardActions>
+        </Card>
+      )
+    }
+
+    /**
+     * step3: コンフィグ書き込み
+     */
+    const SaveConfig = (props) => {
+      const { useState, useEffect } = React
+      const { useForm, useController } = ReactHookForm
+      const { Card, CardHeader, CardContent, CardActions, TextareaAutosize, Button } = MaterialUI
+
+      /**
+        * Radius コンフィグ生成
+        * @params {object} params
+        */
+      const make_radius_config = (params) => {
+        let output = ""
+        params.radius_scheme.map((e) => {
+          output += `radius scheme ${e["0"]}\n`
+          output += `  primary authentication ${e["1"]}\n`
+          output += `  primary accounting ${e["2"]}\n`
+          output += `  key authentication simple ${e["3"]}\n`
+          output += `  key accounting simple ${e["4"]}\n`
+        })
+        params.domain.map((e) => {
+          output += `domain ${e["0"]}\n`
+          output += `  authentication default radius-scheme ${e["1"]}\n`
+          output += `  authorization default radius-scheme ${e["2"]}\n`
+          output += `  accounting default radius-scheme ${e["3"]}\n`
+        })
+        output += `domain default enable ${params.domain_default_enable}\n`
+        return output
+      }
+
+      const [defaultValues, setDefaultValues] = useState({ output: make_radius_config(props.formValue.radius) })
+      const { control, handleSubmit, setError, reset, formState: { isValid } } = useForm({ mode: 'onChange', dafaultValues: { output: make_radius_config(props.formValue.radius) } })
+      const { field: { ref, ...rest }, formState: { errors } } = useController({ name, control })
+
+      useEffect(() => {
+        reset(defaultValues)
+      }, [defaultValues])
+
+      const onSubmit = data => {
+        alert(JSON.stringify(data.output, null, 2))
+      }
+
+      const onReset = () => {
+        props.handleReset()
+      }
+
+      return (
+        <Card elevation={0}>
+          <form onSubmit={handleSubmit(onSubmit)}>
+            <CardHeader title="コンフィグ出力" subheader="設定するコマンドの一覧です。" />
+            <CardContent>
+              <RhfTextarea disabled name="output" control={control} />
+            </CardContent>
+            <CardActions>
+              <Button variant="outlined" sx={{ mr: 1 }} onClick={() => onReset()} >
+                最初に戻る
+              </Button>
+              <Button variant="contained" type="submit">
+                設定
+              </Button>
+            </CardActions>
+          </form>
+        </Card >
+      )
+    }
+
+    /**
+     * Stepper
+     */
+    const Stepper = () => {
+      const { useState } = React
+      const { Container, Card, CardContent, Stepper, Step, StepLabel, StepButton, Typography, Button } = MaterialUI
+      const [activeStep, setActiveStep] = useState(0)
+      const [formValue, setFormValue] = useState({})
+
+      const steps = ['コンフィグ入力', 'GUI設定サンプル', 'コンフィグ出力']
+
+      const changeFormConponent = (activeStep) => {
+        switch (activeStep) {
+          case 0:
+            return <LoadConfig handleNext={handleNext} formValue={formValue} setFormValue={setFormValue} />
+          case 1:
+            return <GUI handleBack={handleBack} handleNext={handleNext} formValue={formValue} setFormValue={setFormValue} />
+          case 2:
+            return <SaveConfig handleBack={handleBack} handleNext={handleNext} handleReset={handleReset} formValue={formValue} />
+        }
+      }
+
+      const handleNext = () => setActiveStep((prevActiveStep) => prevActiveStep + 1)
+      const handleBack = () => setActiveStep((prevActiveStep) => prevActiveStep - 1)
+      const handleReset = () => setActiveStep(0)
+
+      return (
+        <Container sx={{ width: '100%', py: 2 }}>
+          <Card>
+            <CardContent>
+              <Stepper activeStep={activeStep} alternativeLabel>
+                {steps.map((label) => (
+                  <Step key={label}>
+                    <StepLabel>{label}</StepLabel>
+                  </Step>
+                ))}
+              </Stepper>
+              {activeStep === steps.length ? (
+                <>
+                  <Typography sx={{ mt: 2, mb: 1 }}>
+                    All steps completed - you&apos;re finished
+                  </Typography>
+                  <Box sx={{ display: 'flex', flexDirection: 'row', pt: 2 }}>
+                    <Box sx={{ flex: '1 1 auto' }} />
+                    <Button onClick={handleReset}>Reset</Button>
+                  </Box>
+                </>
+              ) : (
+                <>
+                  {changeFormConponent(activeStep)}
+                </>
+              )}
+            </CardContent>
+          </Card>
+        </Container>
+      )
+    }
+
+    /**
+     * App
+     */
+    const App = () => {
+      const { HashRouter, Switch, Link, Route } = ReactRouterDOM
+      const { QueryClient, QueryClientProvider } = ReactQuery
+      const { createTheme, ThemeProvider, CssBaseline } = MaterialUI
+
+      const queryClient = new QueryClient()
+
+      const theme = createTheme({
+        palette: {
+          primary: { light: '#63ccff', main: '#009be5', dark: '#006db3' },
+          background: { default: '#f5f5f5' }
+        },
+        components: {
+          MuiInputLabel: {
+            styleOverrides: {
+              shrink: {
+                fontSize: '1.05rem' //TextField上部に縮小表示されるlabelのフォントサイズ
+              }
+            }
+          }
+        }
+      })
+      return (
+        <QueryClientProvider client={queryClient}>
+          <ThemeProvider theme={theme}>
+            <CssBaseline />
+            <Stepper />
+          </ThemeProvider >
+        </QueryClientProvider>
+      )
+    }
+    const container = document.getElementById('app')
+    const root = ReactDOM.createRoot(container)
+    root.render(<App />)
+  </script>
+</body>
+</html>
