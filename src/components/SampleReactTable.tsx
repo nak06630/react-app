@@ -2,7 +2,7 @@ import { useMemo } from 'react'
 import { Box } from '@mui/material'
 import { useQuery } from '@tanstack/react-query'
 import { fetcher } from '@/hooks/fetcher'
-import BasicReactTable from './components/BasicReactTable'
+import BasicReactTable from '@/components/BasicReactTable'
 
 const useFetchUsers = () => {
   return useQuery({

@@ -3,11 +3,11 @@ import { Card, CardHeader, CardContent } from '@mui/material'
 import { Dashboard, Map as MapIcon, Edit, Hub, LineAxis, TableRowsOutlined } from '@mui/icons-material'
 
 /** 実験用コードは @/components/experimental/ に配置 */
-import Forms from '@/components/experimental/Forms'
-import LineChart from '@/components/experimental/LineChart'
-import Map from '@/components/experimental/Map'
-import Vis from '@/components/experimental/Vis'
-import SampleReactTable from '@/components/experimental/SampleReactTable'
+import Forms from '@/components/Forms'
+import LineChart from '@/components/LineChart'
+import Map from '@/components/Map'
+import Vis from '@/components/Vis'
+import SampleReactTable from '@/components/SampleReactTable'
 
 /** NavigationMenu */
 export const ExperimentalMenu = () => {
