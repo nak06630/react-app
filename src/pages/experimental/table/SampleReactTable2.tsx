@@ -1,8 +1,8 @@
 import { useMemo } from 'react'
-import { Box } from '@mui/material'
+import { Card } from '@mui/material'
 import { useQuery } from '@tanstack/react-query'
 import { fetcher } from '@/hooks/fetcher'
-import BasicReactTable from '@/components/BasicReactTable'
+import BasicReactTable from './BasicReactTable'
 
 const useFetchUsers = () => {
   return useQuery({
@@ -31,9 +31,9 @@ export default function SampleTable() {
   }
 
   return (
-    <Box sx={{ width: '100%' }}>
+    <Card sx={{ width: '100%' }}>
       <h2>ユーザ一覧</h2>
       <BasicReactTable columns={columns} data={data} />
-    </Box>
+    </Card>
   )
 }

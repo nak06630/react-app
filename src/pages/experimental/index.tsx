@@ -3,21 +3,21 @@ import { Card, CardHeader, CardContent } from '@mui/material'
 import { Dashboard, Map as MapIcon, Edit, Hub, LineAxis, TableRowsOutlined } from '@mui/icons-material'
 
 /** 実験用コードは @/components/experimental/ に配置 */
-import Forms from '@/components/Forms'
-import LineChart from '@/components/LineChart'
-import Map from '@/components/Map'
-import Vis from '@/components/Vis'
-import SampleReactTable from '@/components/SampleReactTable'
+import Forms from './form/Forms'
+import LineChart from './LineChart'
+import Map from './Map'
+import Vis from './Vis'
+import Table from './table'
 
 /** NavigationMenu */
 export const ExperimentalMenu = () => {
   return [
     { title: 'Top', icon: Dashboard, href: `/experimental/` },
-    { title: 'Forms', icon: Edit, href: `/experimental/forms` },
+    { title: 'Forms', icon: Edit, href: `/experimental/form/` },
     { title: 'linechart', icon: LineAxis, href: `/experimental/linechart` },
     { title: 'map', icon: MapIcon, href: `/experimental/map` },
     { title: 'Vis', icon: Hub, href: `/experimental/vis` },
-    { title: 'SampleReactTable', icon: TableRowsOutlined, href: `/experimental/samplereacttable` }
+    { title: 'Table', icon: TableRowsOutlined, href: `/experimental/table/` }
   ]
 }
 
@@ -30,7 +30,7 @@ export const ExperimentalRoutes = () => {
       <Route path="/linechart" element={<LineChart />} />
       <Route path="/map" element={<Map />} />
       <Route path="/vis" element={<Vis />} />
-      <Route path="/samplereacttable" element={<SampleReactTable />} />
+      <Route path="/table" element={<Table />} />
     </Routes>
   )
 }
